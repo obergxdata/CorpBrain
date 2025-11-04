@@ -10,6 +10,7 @@ class Person:
     latest_pay: float = 0.0
     tick: int = 0
     purchases: int = 0
+    salary: float = 0
 
     # --- Actions --- #
     def buy(self, budget: float, corps: list[Corporation]):
@@ -31,9 +32,9 @@ class Person:
 
         return
 
-    def get_paid(self, amount: float):
-        self.balance += amount
-        self.latest_pay += amount
+    def get_paid(self):
+        self.balance += self.salary
+        self.latest_pay += self.salary
 
     # --- Control --- #
     def step(self, corps: list[Corporation]):

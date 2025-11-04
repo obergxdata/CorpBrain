@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from stats.history import History
-import random
-
+from agents.agents_logger import logger
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -31,11 +30,11 @@ class Corporation:
         return {
             "change_price": (
                 self.change_price,
-                [-0.03, 0.03],
+                [-0.03, 0, 0.03],
             ),
             "change_employees": (
                 self.change_employees,
-                [-0.03, 0.03],
+                [-0.03, 0, 0.03],
             ),
         }
 
@@ -60,6 +59,7 @@ class Corporation:
         self.cost = self.salary * self.employees
         self.balance -= self.cost
         if self.balance < 0:
+            logger.warning(f"{self.tick}: Company died")
             self.alive = False
 
     def produce(self):
@@ -72,7 +72,7 @@ class Corporation:
     # --- Control --- #
     def step(self, tick: int):
         if not self.alive:
-            raise Exception(f"Corporate is dead tick: {tick}")
+            return
 
         self.tick = tick
         # Take Action

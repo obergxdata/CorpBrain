@@ -10,9 +10,9 @@ import pytest
     "prices,expected",
     [
         ([10, 100, 50], "mid"),
-        ([10, 20, 200], "high"),
-        ([10, 10, 10], "flat"),
-        ([50, 44, 22], "low"),
+        ([10, 20, 200], "very_high"),
+        ([10, 10, 10], "mid"),
+        ([50, 44, 22], "very_low"),
     ],
 )
 def test_price_bucket(prices, expected):
@@ -31,7 +31,7 @@ def test_price_bucket(prices, expected):
     [
         (0.5, "mid"),
         (0.8, "high"),
-        (0.2, "low"),
+        (0.3, "low"),
     ],
 )
 def test_bucket_mpc(mocker, mpc, expected):
@@ -46,7 +46,7 @@ def test_bucket_mpc(mocker, mpc, expected):
     [
         (0.5, "mid"),
         (0.8, "high"),
-        (0.2, "low"),
+        (0.3, "low"),
     ],
 )
 def test_bucket_profit_trend(mocker, trend, expected):
@@ -58,16 +58,23 @@ def test_bucket_profit_trend(mocker, trend, expected):
 
 
 @pytest.mark.parametrize(
-    "share,expected",
+    "share,min_max,expected",
     [
-        (0.5, "mid"),
-        (0.8, "high"),
-        (0.2, "low"),
+        (0.5, (0.1, 0.5), "very_high"),
+        (0.25, (0.1, 0.37), "mid"),
+        (0.01, (0.01, 0.8), "very_low"),
+        (0.30, (0.01, 0.8), "low"),
     ],
 )
-def test_bucket_market_share(mocker, share, expected):
+def test_bucket_market_share(mocker, share, min_max, expected):
     m = Market()
     corp = Corporation()
+    mocker.patch.object(
+        Market,
+        "min_max_market_share",
+        new_callable=PropertyMock,
+        return_value=min_max,
+    )
     mocker.patch.object(Market, "market_share", return_value=share)
     state = StateDisc(market=m)
     assert state.bucket_market_share(corp=corp) == expected

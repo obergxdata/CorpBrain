@@ -49,8 +49,9 @@ class StateDisc:
         return self.bucket_0_1(corp.profit_trend(zero=True))
 
     def bucket_market_share(self, corp: "Corporation"):
-        max_market, min_market = self.market.min_max_market_share
+        min_market, max_market = self.market.min_max_market_share
         market_share = self.market.market_share(corp)
+
         return self.bucket_0_1(market_share, min_value=min_market, max_value=max_market)
 
     def get_state(self, corp: "Corporation"):
