@@ -11,8 +11,8 @@ def test_run_10(mocker):
     mock_person_seed = mocker.patch("agents.market.agent.PERSON_SEED")
 
     # Sim conf
-    mock_sim_conf.nr_of_people = 500
-    mock_sim_conf.nr_of_corps = 1
+    mock_sim_conf.nr_of_people = 1500
+    mock_sim_conf.nr_of_corps = 8
     mock_sim_conf.base_salary = 100
     mock_sim_conf.nr_of_ticks = 100
 
@@ -30,8 +30,8 @@ def test_run_10(mocker):
     m.init_corps()
     m.init_people()
 
-    for _ in range(0, 48):
+    for _ in range(0, 500):
         m.step()
 
     rand_corp = random.choice(m.corporations)
-    raise Exception(rand_corp.history.data)
+    raise Exception(rand_corp.MDP.format_env())

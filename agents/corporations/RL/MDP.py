@@ -16,37 +16,31 @@ class StateDisc:
 
     def __init__(self, market: "Market"):
         self.market = market
+        self.state_map: dict = {}
+
+    def bucket_0_1(self, value: float, min_value: float = 0.0, max_value: float = 1.0):
+        # Normalize value to 0-1 range
+        if min_value == max_value:
+            normalized = 0.5
+        else:
+            normalized = (value - min_value) / (max_value - min_value)
+
+        # Apply bucketing to normalized value
+        if normalized <= 0.2:
+            return "very_low"
+        elif normalized <= 0.4:
+            return "low"
+        elif normalized <= 0.6:
+            return "mid"
+        elif normalized <= 0.8:
+            return "high"
+        else:
+            return "very_high"
 
     def bucket_price(self, corp: "Corporation"):
         min_price, max_price = self.market.min_max_price
-        if min_price == max_price:
-            return "flat"
-
-        range_size = (max_price - min_price) / 3
-        low_threshold = min_price + range_size
-        high_threshold = min_price + 2 * range_size
-
-        if corp.price <= low_threshold:
-            bucket = "low"
-        elif corp.price <= high_threshold:
-            bucket = "mid"
-        else:
-            bucket = "high"
-
-        return bucket
-
-    def bucket_0_1(self, value: float):
-        low_threshold = 0.37
-        high_threshold = 0.67
-
-        if value <= low_threshold:
-            bucket = "low"
-        elif value <= high_threshold:
-            bucket = "mid"
-        else:
-            bucket = "high"
-
-        return bucket
+        price = corp.price
+        return self.bucket_0_1(price, min_value=min_price, max_value=max_price)
 
     def bucket_mpc(self):
         return self.bucket_0_1(self.market.avg_mpc)
@@ -55,7 +49,9 @@ class StateDisc:
         return self.bucket_0_1(corp.profit_trend(zero=True))
 
     def bucket_market_share(self, corp: "Corporation"):
-        return self.bucket_0_1(self.market.market_share(corp))
+        max_market, min_market = self.market.min_max_market_share
+        market_share = self.market.market_share(corp)
+        return self.bucket_0_1(market_share, min_value=min_market, max_value=max_market)
 
     def get_state(self, corp: "Corporation"):
         state = {
@@ -98,17 +94,24 @@ class BellmanMDP:
 
         if random.random() < epsilon or state not in self.policy:
             # Explore: Random action
-            action = None
+            logger.info("Explore random action")
+            random_key = random.choice(list(self.corp.actions().keys()))
+            action_set = self.corp.actions()[random_key]
+            action_func = action_set[0]  # self.change_price
+            action_value = random.choice(action_set[1])  # [0.1,0.4,0.6] -> 0.4
+            action_func(action_value)
+            action = f"{random_key}_{action_value}"
         else:
             # Exploit: choose best action
+            logger.info("Exploit policy")
             action = self.policy[state][0]
 
+        logger.info(f"Action is {action}")
         self.record_action(action)
 
     def record_action(self, action: str):
         state_hash = self.state
         self.eval_queue = (state_hash, action)
-        logger.info(f"Raw state is {self.state_disc.get_state(self.corp)}")
         logger.info(f"Performing {action} in state {state_hash} ")
 
     def _eval_action(self, reward: int):
@@ -127,6 +130,9 @@ class BellmanMDP:
 
         #  = [(abc123, 4), (abc123, 2), (cde321, -20)]
         next_states = self.records[prev_state][prev_action]
+        logger.debug(
+            f"Updating {prev_state[:8]}[{prev_action}] with {len(next_states)} observations"
+        )
 
         # Group states and collect rewards
         state_data = defaultdict(list)
@@ -187,3 +193,29 @@ class BellmanMDP:
     @property
     def state(self):
         return self.state_disc.hash_state(self.corp)
+
+    def format_env(self) -> str:
+        """Format the MDP environment in a readable way."""
+        lines = []
+
+        for state_hash, actions in self.env.items():
+            # State header
+            state_short = state_hash[:8]
+            lines.append(f"\nState: {state_short} ({len(actions)} actions)")
+
+            # Each action
+            for action, transitions in actions.items():
+                lines.append(f"  Action: {action}")
+
+                # Each transition
+                for prob, next_state, reward in transitions:
+                    next_short = next_state[:8]
+                    lines.append(
+                        f"    -> {next_short} (prob: {prob:.2f}, reward: {reward:.2f})"
+                    )
+
+        # Summary at the end
+        lines.append(f"\n{'='*50}")
+        lines.append(f"Total unique states: {len(self.env)}")
+
+        return "\n".join(lines)

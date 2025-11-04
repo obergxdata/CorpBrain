@@ -27,6 +27,18 @@ class Corporation:
     history: History = field(default_factory=lambda: History(window=256))
     MDP: "BellmanMDP | None" = None
 
+    def actions(self):
+        return {
+            "change_price": (
+                self.change_price,
+                [-0.03, 0.03],
+            ),
+            "change_employees": (
+                self.change_employees,
+                [-0.03, 0.03],
+            ),
+        }
+
     # --- Actions --- #
     def sell(self, orders: int):
         # We register demand either way
@@ -40,8 +52,9 @@ class Corporation:
 
     def change_price(self, pct: float):
         self.price *= 1 + pct
-        if self.MDP:
-            self.MDP.record_action(f"changed_price_{pct}")
+
+    def change_employees(self, pct: float):
+        self.employees *= 1 + pct
 
     def pay_saleries(self):
         self.cost = self.salary * self.employees
@@ -56,19 +69,14 @@ class Corporation:
         self.produced = qty
         self.stock += qty
 
-    def choose_action(self):
-        if self.MDP:
-            self.MDP.choose_action()
-
     # --- Control --- #
     def step(self, tick: int):
         if not self.alive:
             raise Exception(f"Corporate is dead tick: {tick}")
 
         self.tick = tick
-        if self.MDP:
-            self.choose_action()
-            # Take action
+        # Take Action
+        self.MDP.choose_action()
         self.produce()
         self.pay_saleries()
         # Save metric history
@@ -137,6 +145,9 @@ class Corporation:
 
         delta_balance = self.history.delta("balance")
         reward += 0.5 * (delta_balance / 100.0)
+
+        delta_produce = self.history.delta("produce")
+        reward += 0.5 * (delta_produce / 100.0)
 
         return reward
 

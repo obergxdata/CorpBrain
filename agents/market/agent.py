@@ -58,6 +58,11 @@ class Market:
         return min(prices), max(prices)
 
     @property
+    def min_max_market_share(self):
+        market_share = [self.market_share(corp) for corp in self.corporations]
+        return min(market_share), max(market_share)
+
+    @property
     def avg_mpc(self):
         return sum([p.mpc for p in self.people]) / len(self.people)
 
