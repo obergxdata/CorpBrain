@@ -30,11 +30,7 @@ class Corporation:
         return {
             "change_price": (
                 self.change_price,
-                [-0.03, 0, 0.03],
-            ),
-            "change_employees": (
-                self.change_employees,
-                [-0.03, 0, 0.03],
+                [-0.10, -0.05, -0.03, -0.02, -0.01, 0, 0.01, 0.02, 0.03, 0.1],
             ),
         }
 
@@ -65,7 +61,11 @@ class Corporation:
     def produce(self):
         if self.capacity <= 0:
             raise Exception(f"No capacity tick: {self.tick}")
-        qty = min(self.capacity - self.stock, self.demand)
+
+        if self.tick == 1:
+            qty = self.capacity
+        else:
+            qty = min(self.capacity - self.stock, self.history.last("demand"))
         self.produced = qty
         self.stock += qty
 
@@ -79,11 +79,11 @@ class Corporation:
         self.MDP.choose_action()
         self.produce()
         self.pay_saleries()
-        # Save metric history
+
+    def finish_step(self):
         self.record()
         # Take MDP step
-        if self.MDP:
-            self.MDP.step()
+        self.MDP.step()
         # Reset values
         self.clean()
 
@@ -139,16 +139,8 @@ class Corporation:
 
     @property
     def reward(self):
-        # Calculate delta
         delta_profit = self.history.delta("profit")
         reward = delta_profit / 10.0
-
-        delta_balance = self.history.delta("balance")
-        reward += 0.5 * (delta_balance / 100.0)
-
-        delta_produce = self.history.delta("produce")
-        reward += 0.5 * (delta_produce / 100.0)
-
         return reward
 
     def profit_trend(self, zero: bool = False):

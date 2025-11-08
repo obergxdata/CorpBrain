@@ -7,6 +7,7 @@ from agents.corporations.agent import Corporation
 from agents.corporations.RL.MDP import BellmanMDP, StateDisc
 from agents.people.agent import Person
 from agents.agents_logger import logger
+import numpy as np
 import random
 
 SIM_CONFIG = SimConfig()
@@ -43,6 +44,9 @@ class Market:
         for person in self.people:
             person.get_paid()
             person.step(corps=self.person_corp_list())
+
+        for corp in self.corporations:
+            corp.finish_step()
 
         self.record()
 
@@ -84,6 +88,15 @@ class Market:
         return min(market_share), max(market_share)
 
     @property
+    def avg_salary(self):
+        return sum([p.salary for p in self.people]) / len(self.people)
+
+    @property
+    def min_max_salary(self):
+        salaries = [p.salary for p in self.people]
+        return min(salaries), max(salaries)
+
+    @property
     def avg_mpc(self):
         return sum([p.mpc for p in self.people]) / len(self.people)
 
@@ -106,10 +119,13 @@ class Market:
             self.corporations.append(corp)
 
     def init_people(self):
-        for _ in range(0, SIM_CONFIG.nr_of_people):
-            salary = random.randint(
-                SIM_CONFIG.min_base_salary, SIM_CONFIG.max_base_salary
-            )
+        salaries = self.generate_income_distribution(
+            min_income=SIM_CONFIG.min_base_salary,
+            max_income=SIM_CONFIG.max_base_salary,
+            n=SIM_CONFIG.nr_of_people,
+        )
+        for i in range(0, SIM_CONFIG.nr_of_people):
+            salary = salaries[i]
             person = Person(
                 mpc=PERSON_SEED.mpc,
                 salary=salary,
@@ -117,3 +133,13 @@ class Market:
                 latest_pay=salary,
             )
             self.people.append(person)
+
+    def generate_income_distribution(self, min_income, max_income, n) -> list:
+
+        mean = (min_income + max_income) / 2
+        std = (max_income - min_income) / 6  # ~99.7% of values within range
+
+        incomes = np.random.normal(mean, std, n)
+        incomes = np.clip(incomes, min_income, max_income)
+
+        return incomes

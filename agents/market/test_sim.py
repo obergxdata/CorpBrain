@@ -18,11 +18,11 @@ def test_run_10(mocker):
     mock_sim_conf.nr_of_ticks = 100
 
     # Corp seed
-    mock_corp_seed.balance = 50000
-    mock_corp_seed.price = 35
+    mock_corp_seed.balance = 500000
+    mock_corp_seed.price = 20
     mock_corp_seed.salary = 100
     mock_corp_seed.nr_of_employees = 10
-    mock_corp_seed.upe = 8
+    mock_corp_seed.upe = 50
     # Person seed
     mock_person_seed.mpc = 0.5
     mock_person_seed.balance = 0
@@ -31,7 +31,7 @@ def test_run_10(mocker):
     m.init_corps()
     m.init_people()
 
-    for _ in range(0, 10000):
+    for _ in range(0, 1000):
         if m.stop:
             return
 
@@ -41,4 +41,6 @@ def test_run_10(mocker):
     m.history.chart(keys=["avg_price"], name="avg_price")
     m.history.chart(keys=["avg_nr_employees"], name="avg_nr_employees")
     rand_corp = random.choice(m.corporations)
+    rand_corp.history.chart(keys=["sales"], name="sales")
+
     raise Exception(rand_corp.MDP.format_env())

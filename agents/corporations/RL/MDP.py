@@ -25,17 +25,9 @@ class StateDisc:
         else:
             normalized = (value - min_value) / (max_value - min_value)
 
-        # Apply bucketing to normalized value
-        if normalized <= 0.2:
-            return "very_low"
-        elif normalized <= 0.4:
-            return "low"
-        elif normalized <= 0.6:
-            return "mid"
-        elif normalized <= 0.8:
-            return "high"
-        else:
-            return "very_high"
+        # Apply bucketing to normalized value (10 buckets: 0-9)
+        bucket = min(int(normalized * 20), 19)  # Ensures 1.0 goes to bucket 9
+        return f"bucket_{bucket}"
 
     def bucket_price(self, corp: "Corporation"):
         min_price, max_price = self.market.min_max_price
@@ -45,8 +37,37 @@ class StateDisc:
     def bucket_mpc(self):
         return self.bucket_0_1(self.market.avg_mpc)
 
+    def bucket_relative_price(self, corp: "Corporation"):
+        min_salary, max_salary = self.market.min_max_salary
+        mpc = self.market.people[0].mpc
+        min_budget = min_salary * mpc
+        max_budget = max_salary * mpc
+
+        # Use consumer budget range as reference (deterministic)
+        # Prices below min_budget → negative buckets (discount pricing)
+        # Prices above max_budget → high positive buckets (premium pricing)
+        # Each bucket represents 5% of the budget range
+        return self.bucket_0_1(
+            value=corp.price, min_value=min_budget, max_value=max_budget
+        )
+
     def bucket_profit_trend(self, corp: "Corporation"):
         return self.bucket_0_1(corp.profit_trend(zero=True))
+
+    def profit_trend(self, corp: "Corporation"):
+
+        profit = corp.history.tail("profit", 2)
+        if len(profit) == 2:
+            prev = profit[1]
+            now = profit[0]
+            if prev == now:
+                return 0
+            elif prev > now:
+                return -1
+            else:
+                return 1
+        else:
+            return 0
 
     def bucket_market_share(self, corp: "Corporation"):
         min_market, max_market = self.market.min_max_market_share
@@ -56,17 +77,20 @@ class StateDisc:
 
     def get_state(self, corp: "Corporation"):
         state = {
-            "price_bucket": self.bucket_price(corp),
-            "mpc_bucket": self.bucket_mpc(),
-            "profit_trend_bucket": self.bucket_profit_trend(corp),
-            "market_share_bucket": self.bucket_market_share(corp),
+            "bucket_price": self.bucket_price(corp),
+            "bucket_relative_price": self.bucket_relative_price(corp),
+            # "bucket_sales:": self.profit_trend(corp),
         }
 
+        logger.debug(state)
         return state
 
     def hash_state(self, corp: "Corporation"):
-        state = json.dumps(self.get_state(corp))
-        return hashlib.sha1(state.encode("utf-8")).hexdigest()
+        state = self.get_state(corp)
+        str_state = json.dumps(state)
+        hashed = hashlib.sha1(str_state.encode("utf-8")).hexdigest()
+        self.state_map[hashed] = state
+        return hashed
 
 
 class BellmanMDP:
@@ -90,7 +114,7 @@ class BellmanMDP:
             self.build_policy()
 
     def choose_action(self):
-        epsilon = max(0.05, 1.0 - (self.corp.tick / self.corp.max_tick))
+        epsilon = max(0.05, 1.0 - (self.corp.tick / (self.corp.max_tick * 0.75)))
         state = self.state
 
         if random.random() < epsilon or state not in self.policy:
@@ -107,13 +131,22 @@ class BellmanMDP:
             logger.info("Exploit policy")
             action = self.policy[state][0]
 
-        logger.info(f"Action is {action}")
-        self.record_action(action)
+            # Parse and execute the policy action
+            # Action format: "change_price_0.1"
+            action_parts = action.split("_")
+            action_name = "_".join(action_parts[:-1])  # "change_price"
+            action_value = float(action_parts[-1])  # 0.1
 
-    def record_action(self, action: str):
-        state_hash = self.state
-        self.eval_queue = (state_hash, action)
-        logger.info(f"Performing {action} in state {state_hash} ")
+            # Get the action function and execute it
+            action_func = self.corp.actions()[action_name][0]
+            action_func(action_value)
+
+        logger.info(f"Action is {action}")
+        self.record_action(action, state=state)
+
+    def record_action(self, action: str, state: str):
+        self.eval_queue = (state, action)
+        logger.info(f"Performing {action} in state {state} ")
 
     def _eval_action(self, reward: int):
         if self.eval_queue:
@@ -201,8 +234,11 @@ class BellmanMDP:
 
         for state_hash, actions in self.env.items():
             # State header
-            state_short = state_hash[:8]
-            lines.append(f"\nState: {state_short} ({len(actions)} actions)")
+            readable_state = self.state_disc.state_map[state_hash]
+            # state_short = state_hash[:8]
+            lines.append(
+                f"\nState: {readable_state} ({len(actions)} actions): {state_hash[:8]}"
+            )
 
             # Each action
             for action, transitions in actions.items():
