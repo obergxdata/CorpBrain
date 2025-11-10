@@ -9,10 +9,10 @@ import pytest
 @pytest.mark.parametrize(
     "prices,expected",
     [
-        ([10, 100, 50], "mid"),
-        ([10, 20, 200], "very_high"),
-        ([10, 10, 10], "mid"),
-        ([50, 44, 22], "very_low"),
+        ([10, 100, 50], "bucket_8"),
+        ([10, 20, 200], "bucket_19"),
+        ([10, 10, 10], "bucket_10"),
+        ([50, 44, 22], "bucket_0"),
     ],
 )
 def test_price_bucket(prices, expected):
@@ -24,60 +24,6 @@ def test_price_bucket(prices, expected):
     # Last corp
     state = StateDisc(market=m)
     assert state.bucket_price(corp=corp) == expected
-
-
-@pytest.mark.parametrize(
-    "mpc,expected",
-    [
-        (0.5, "mid"),
-        (0.8, "high"),
-        (0.3, "low"),
-    ],
-)
-def test_bucket_mpc(mocker, mpc, expected):
-    m = Market()
-    mocker.patch.object(Market, "avg_mpc", new_callable=PropertyMock, return_value=mpc)
-    state = StateDisc(market=m)
-    assert state.bucket_mpc() == expected
-
-
-@pytest.mark.parametrize(
-    "trend,expected",
-    [
-        (0.5, "mid"),
-        (0.8, "high"),
-        (0.3, "low"),
-    ],
-)
-def test_bucket_profit_trend(mocker, trend, expected):
-    m = Market()
-    corp = Corporation()
-    mocker.patch.object(Corporation, "profit_trend", return_value=trend)
-    state = StateDisc(market=m)
-    assert state.bucket_profit_trend(corp=corp) == expected
-
-
-@pytest.mark.parametrize(
-    "share,min_max,expected",
-    [
-        (0.5, (0.1, 0.5), "very_high"),
-        (0.25, (0.1, 0.37), "mid"),
-        (0.01, (0.01, 0.8), "very_low"),
-        (0.30, (0.01, 0.8), "low"),
-    ],
-)
-def test_bucket_market_share(mocker, share, min_max, expected):
-    m = Market()
-    corp = Corporation()
-    mocker.patch.object(
-        Market,
-        "min_max_market_share",
-        new_callable=PropertyMock,
-        return_value=min_max,
-    )
-    mocker.patch.object(Market, "market_share", return_value=share)
-    state = StateDisc(market=m)
-    assert state.bucket_market_share(corp=corp) == expected
 
 
 def test_hash_state(mocker):
@@ -100,7 +46,7 @@ def test_mdp_env_eval_action(mocker):
     mdp = BellmanMDP(state_disc=state, corp=corp)
 
     # Perform price increase
-    mdp.record_action("price_increase")
+    mdp.record_action("price_increase", state=hash_state)
     assert mdp.eval_queue == (hash_state, "price_increase")
     # Evaluate action from queue
     mdp._eval_action(reward=10)
@@ -109,14 +55,14 @@ def test_mdp_env_eval_action(mocker):
     mdp._eval_action(reward=20)
     assert dict(dict(mdp.records)[hash_state]) == {"price_increase": [("abc1", 10)]}
     # Perform hire in same state
-    mdp.record_action("hire")
+    mdp.record_action("hire", state=hash_state)
     mdp._eval_action(reward=15)
     assert dict(dict(mdp.records)[hash_state]) == {
         "price_increase": [("abc1", 10)],
         "hire": [("abc1", 15)],
     }
     # Add a new price_increase with different reward
-    mdp.record_action("price_increase")
+    mdp.record_action("price_increase", state=hash_state)
     mdp._eval_action(reward=12)
     assert dict(dict(mdp.records)[hash_state]) == {
         "price_increase": [("abc1", 10), ("abc1", 12)],
@@ -125,7 +71,7 @@ def test_mdp_env_eval_action(mocker):
     # Add new state
     hash_state = "abc2"
     mocker.patch.object(StateDisc, "hash_state", return_value=hash_state)
-    mdp.record_action("hire")
+    mdp.record_action("hire", state=hash_state)
     mdp._eval_action(reward=5)
     assert dict(dict(mdp.records)[hash_state]) == {"hire": [("abc2", 5)]}
 

@@ -34,46 +34,15 @@ class StateDisc:
         price = corp.price
         return self.bucket_0_1(price, min_value=min_price, max_value=max_price)
 
-    def bucket_mpc(self):
-        return self.bucket_0_1(self.market.avg_mpc)
-
     def bucket_relative_price(self, corp: "Corporation"):
         min_salary, max_salary = self.market.min_max_salary
         mpc = self.market.people[0].mpc
         min_budget = min_salary * mpc
         max_budget = max_salary * mpc
 
-        # Use consumer budget range as reference (deterministic)
-        # Prices below min_budget → negative buckets (discount pricing)
-        # Prices above max_budget → high positive buckets (premium pricing)
-        # Each bucket represents 5% of the budget range
         return self.bucket_0_1(
             value=corp.price, min_value=min_budget, max_value=max_budget
         )
-
-    def bucket_profit_trend(self, corp: "Corporation"):
-        return self.bucket_0_1(corp.profit_trend(zero=True))
-
-    def profit_trend(self, corp: "Corporation"):
-
-        profit = corp.history.tail("profit", 2)
-        if len(profit) == 2:
-            prev = profit[1]
-            now = profit[0]
-            if prev == now:
-                return 0
-            elif prev > now:
-                return -1
-            else:
-                return 1
-        else:
-            return 0
-
-    def bucket_market_share(self, corp: "Corporation"):
-        min_market, max_market = self.market.min_max_market_share
-        market_share = self.market.market_share(corp)
-
-        return self.bucket_0_1(market_share, min_value=min_market, max_value=max_market)
 
     def get_state(self, corp: "Corporation"):
         state = {
@@ -106,6 +75,7 @@ class BellmanMDP:
         self.theta: float = 1e-6
         self.V: dict = {}
         self.policy: dict = {}
+        self.past_actions: dict = {}
 
     def step(self):
         if self.eval_queue:
@@ -125,24 +95,17 @@ class BellmanMDP:
             action_func = action_set[0]  # self.change_price
             action_value = random.choice(action_set[1])  # [0.1,0.4,0.6] -> 0.4
             action_func(action_value)
-            action = f"{random_key}_{action_value}"
+            action_key = f"{random_key}_{action_value}"
+            self.past_actions[action_key] = (action_func, action_value)
         else:
             # Exploit: choose best action
             logger.info("Exploit policy")
-            action = self.policy[state][0]
-
-            # Parse and execute the policy action
-            # Action format: "change_price_0.1"
-            action_parts = action.split("_")
-            action_name = "_".join(action_parts[:-1])  # "change_price"
-            action_value = float(action_parts[-1])  # 0.1
-
-            # Get the action function and execute it
-            action_func = self.corp.actions()[action_name][0]
+            action_key = self.policy[state][0]
+            action_func, action_value = self.past_actions[action_key]
             action_func(action_value)
 
-        logger.info(f"Action is {action}")
-        self.record_action(action, state=state)
+        logger.info(f"Action is {action_key}")
+        self.record_action(action_key, state=state)
 
     def record_action(self, action: str, state: str):
         self.eval_queue = (state, action)

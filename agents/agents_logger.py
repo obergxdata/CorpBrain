@@ -16,9 +16,11 @@ if not logger.handlers:
     )
     logger.addHandler(console)
 
+    """
     file = logging.FileHandler("logs/agents.log", mode="w")
     file.setLevel(logging.DEBUG)
     file.setFormatter(
         logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", datefmt="%H:%M:%S")
     )
     logger.addHandler(file)
+    """

@@ -29,13 +29,26 @@ def test_init_corps(mocker):
     assert random.choice(m.corporations).balance == 100
 
 
+"""
+      salaries = self.generate_income_distribution(
+            min_income=SIM_CONFIG.min_base_salary,
+            max_income=SIM_CONFIG.max_base_salary,
+            n=SIM_CONFIG.nr_of_people,
+        )
+"""
+
+
 def test_init_people(mocker):
     mock_conf = mocker.patch("agents.market.agent.SIM_CONFIG")
-    mock_conf.nr_of_people = 5
+    mock_conf.nr_of_people = 100
+    mock_conf.min_base_salary = 45
+    mock_conf.max_base_salary = 100
     m = Market()
     m.init_people()
 
-    assert len(m.people) == 5
+    assert len(m.people) == 100
+    assert max([p.salary for p in m.people]) == pytest.approx(100, 5)
+    assert min([p.salary for p in m.people]) == pytest.approx(45, 50)
 
 
 def test_person_corp_list():

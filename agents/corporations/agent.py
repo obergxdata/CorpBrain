@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from stats.history import History
 from agents.agents_logger import logger
 from typing import TYPE_CHECKING
+import uuid
 
 if TYPE_CHECKING:
     from agents.corporations.RL.MDP import BellmanMDP
@@ -23,6 +24,7 @@ class Corporation:
     produced: int = 0
     price: float = 0.0
     alive: bool = True
+    name: str = str(uuid.uuid4())
     history: History = field(default_factory=lambda: History(window=256))
     MDP: "BellmanMDP | None" = None
 
@@ -142,12 +144,3 @@ class Corporation:
         delta_profit = self.history.delta("profit")
         reward = delta_profit / 10.0
         return reward
-
-    def profit_trend(self, zero: bool = False):
-        try:
-            return self.history.trend("profit")
-        except ValueError as e:
-            if zero:
-                return 0
-            else:
-                raise e

@@ -1,8 +1,4 @@
-import pytest
-from unittest.mock import patch
-
 from agents.corporations.agent import Corporation
-from agents.market.agent import Market
 
 
 def test_properties():
