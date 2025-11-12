@@ -9,10 +9,10 @@ import pytest
 @pytest.mark.parametrize(
     "prices,expected",
     [
-        ([10, 100, 50], "bucket_8"),
-        ([10, 20, 200], "bucket_19"),
-        ([10, 10, 10], "bucket_10"),
-        ([50, 44, 22], "bucket_0"),
+        ([10, 100, 50], 0.4),
+        ([10, 20, 200], 1.0),
+        ([10, 10, 10], 0.5),
+        ([50, 44, 22], 0.0),
     ],
 )
 def test_price_bucket(prices, expected):

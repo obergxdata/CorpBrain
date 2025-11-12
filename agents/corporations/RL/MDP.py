@@ -2,14 +2,12 @@ import json
 import hashlib
 from collections import defaultdict
 import random
-
+import numpy as np
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from agents.market.agent import Market
     from agents.corporations.agent import Corporation
-
-from agents.mdp_logger import logger
 
 
 class StateDisc:
@@ -18,21 +16,19 @@ class StateDisc:
         self.market = market
         self.state_map: dict = {}
 
-    def bucket_0_1(self, value: float, min_value: float = 0.0, max_value: float = 1.0):
-        # Normalize value to 0-1 range
-        if min_value == max_value:
-            normalized = 0.5
-        else:
-            normalized = (value - min_value) / (max_value - min_value)
-
-        # Apply bucketing to normalized value (10 buckets: 0-9)
-        bucket = min(int(normalized * 20), 19)  # Ensures 1.0 goes to bucket 9
-        return f"bucket_{bucket}"
+    def bucketize(self, value, step=0.1):
+        return round(round(value / step) * step, 2)
 
     def bucket_price(self, corp: "Corporation"):
         min_price, max_price = self.market.min_max_price
-        price = corp.price
-        return self.bucket_0_1(price, min_value=min_price, max_value=max_price)
+
+        if max_price == min_price:
+            value = 0.5
+        else:
+            value = (corp.price - min_price) / (max_price - min_price)
+            value = max(0.0, min(1.0, value))  # 👈 clamp between 0–1
+
+        return self.bucketize(value)
 
     def bucket_relative_price(self, corp: "Corporation"):
         min_salary, max_salary = self.market.min_max_salary
@@ -40,18 +36,15 @@ class StateDisc:
         min_budget = min_salary * mpc
         max_budget = max_salary * mpc
 
-        return self.bucket_0_1(
-            value=corp.price, min_value=min_budget, max_value=max_budget
-        )
+        norm = (corp.price - min_budget) / (max_budget - min_budget)
+        return self.bucketize(norm)
 
     def get_state(self, corp: "Corporation"):
         state = {
             "bucket_price": self.bucket_price(corp),
             "bucket_relative_price": self.bucket_relative_price(corp),
-            # "bucket_sales:": self.profit_trend(corp),
         }
 
-        logger.debug(state)
         return state
 
     def hash_state(self, corp: "Corporation"):
@@ -70,26 +63,31 @@ class BellmanMDP:
         self.env: dict = defaultdict(lambda: defaultdict(list))
         self.eval_queue: tuple = ()
         self.records: dict = defaultdict(lambda: defaultdict(list))
-        self.max_iters: int = 10000
+        self.max_iters: int = 100
         self.gamma: float = 0.90
         self.theta: float = 1e-6
         self.V: dict = {}
         self.policy: dict = {}
         self.past_actions: dict = {}
+        self.state_visits = defaultdict(int)
 
     def step(self):
+        self.state_visits[self.state] += 1
         if self.eval_queue:
             self._eval_action(self.corp.reward)
-            self.value_iter()
-            self.build_policy()
+            if random.random() < self.get_epsilon():
+                self.value_iter()
+                self.build_policy()
+
+    def get_epsilon(self):
+
+        return max(0.02, np.exp(-3 * self.corp.tick / self.corp.max_tick))
 
     def choose_action(self):
-        epsilon = max(0.05, 1.0 - (self.corp.tick / (self.corp.max_tick * 0.75)))
         state = self.state
 
-        if random.random() < epsilon or state not in self.policy:
+        if random.random() < self.get_epsilon() or state not in self.policy:
             # Explore: Random action
-            logger.info("Explore random action")
             random_key = random.choice(list(self.corp.actions().keys()))
             action_set = self.corp.actions()[random_key]
             action_func = action_set[0]  # self.change_price
@@ -99,22 +97,19 @@ class BellmanMDP:
             self.past_actions[action_key] = (action_func, action_value)
         else:
             # Exploit: choose best action
-            logger.info("Exploit policy")
             action_key = self.policy[state][0]
             action_func, action_value = self.past_actions[action_key]
+
             action_func(action_value)
 
-        logger.info(f"Action is {action_key}")
         self.record_action(action_key, state=state)
 
     def record_action(self, action: str, state: str):
         self.eval_queue = (state, action)
-        logger.info(f"Performing {action} in state {state} ")
 
     def _eval_action(self, reward: int):
         if self.eval_queue:
             prev_state, prev_action = self.eval_queue
-            logger.info(f"Evaluating prev-state: {prev_state} for action {prev_action}")
             state_hash = self.state
             record = (state_hash, reward)
             self.records[prev_state][prev_action].append(record)
@@ -127,9 +122,6 @@ class BellmanMDP:
 
         #  = [(abc123, 4), (abc123, 2), (cde321, -20)]
         next_states = self.records[prev_state][prev_action]
-        logger.debug(
-            f"Updating {prev_state[:8]}[{prev_action}] with {len(next_states)} observations"
-        )
 
         # Group states and collect rewards
         state_data = defaultdict(list)

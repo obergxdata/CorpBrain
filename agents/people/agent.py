@@ -1,5 +1,7 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from agents.corporations.agent import Corporation
+import uuid
+import random
 
 
 @dataclass(slots=True)
@@ -11,6 +13,7 @@ class Person:
     tick: int = 0
     purchases: int = 0
     salary: float = 0
+    name: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     # --- Actions --- #
     def buy(self, budget: float, corps: list[Corporation]):
@@ -40,8 +43,14 @@ class Person:
     def step(self, corps: list[Corporation]):
         self.tick += 1
 
+        # Imperfect information: each person only sees 50% of available corporations
+        sample_size = max(1, len(corps) // 2)
+        visible_corps = random.sample(corps, sample_size)
+        # Sort by price (cheapest first) - stable sort preserves random sample order for ties
+        visible_corps.sort(key=lambda c: c.price)
+
         budget = self.latest_pay * self.mpc
-        self.buy(budget=budget, corps=corps)
+        self.buy(budget=budget, corps=visible_corps)
         self.latest_pay = 0
 
     def clean(self):

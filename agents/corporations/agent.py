@@ -1,8 +1,11 @@
 from dataclasses import dataclass, field
 from stats.history import History
-from agents.agents_logger import logger
 from typing import TYPE_CHECKING
 import uuid
+import random
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 if TYPE_CHECKING:
     from agents.corporations.RL.MDP import BellmanMDP
@@ -24,23 +27,26 @@ class Corporation:
     produced: int = 0
     price: float = 0.0
     alive: bool = True
-    name: str = str(uuid.uuid4())
-    history: History = field(default_factory=lambda: History(window=256))
+    name: str = field(default_factory=lambda: str(uuid.uuid4()))
+    history: History = field(default_factory=lambda: History(window=5000))
     MDP: "BellmanMDP | None" = None
 
     def actions(self):
-        return {
+        actions = {
             "change_price": (
                 self.change_price,
                 [-0.10, -0.05, -0.03, -0.02, -0.01, 0, 0.01, 0.02, 0.03, 0.1],
             ),
         }
 
+        return actions
+
     # --- Actions --- #
     def sell(self, orders: int):
         # We register demand either way
         self.demand += orders
         if self.stock >= orders:
+
             self.stock -= orders
             self.sales += orders
             self.balance += self.price * orders
@@ -50,19 +56,17 @@ class Corporation:
     def change_price(self, pct: float):
         self.price *= 1 + pct
 
-    def change_employees(self, pct: float):
-        self.employees *= 1 + pct
+    def change_employees(self, q: int):
+        self.employees += q
 
     def pay_saleries(self):
         self.cost = self.salary * self.employees
         self.balance -= self.cost
         if self.balance < 0:
-            logger.warning(f"{self.tick}: Company died")
+            logging.warning(f"corp {self.name} is dead")
             self.alive = False
 
     def produce(self):
-        if self.capacity <= 0:
-            raise Exception(f"No capacity tick: {self.tick}")
 
         if self.tick == 1:
             qty = self.capacity
@@ -78,7 +82,8 @@ class Corporation:
 
         self.tick = tick
         # Take Action
-        self.MDP.choose_action()
+        if tick > 1 and random.randint(1, 3) == 2:
+            self.MDP.choose_action()
         self.produce()
         self.pay_saleries()
 
@@ -141,6 +146,6 @@ class Corporation:
 
     @property
     def reward(self):
-        delta_profit = self.history.delta("profit")
-        reward = delta_profit / 10.0
-        return reward
+
+        profit_reward = self.history.delta("profit") / 10.0
+        return profit_reward

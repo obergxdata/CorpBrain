@@ -58,7 +58,7 @@ class History:
 
         return sum(percentage_changes) / len(percentage_changes)
 
-    def chart(self, keys: list[str], name: str, log_scale: bool = False):
+    def chart(self, keys: list[str], name: str, log_scale: bool = False, subfolder: str = None, smooth: int = 1):
         """
         Plot the values for the specified keys using matplotlib.
         X-axis starts from 1 and increments for each data point.
@@ -68,6 +68,8 @@ class History:
             keys: List of keys to plot from self.data
             name: Name for the chart file (without extension)
             log_scale: If True, use logarithmic scale for Y-axis
+            subfolder: Optional subfolder within 'charts' directory to save the chart
+            smooth: Window size for moving average smoothing (default: 1, no smoothing)
         """
         if not keys:
             print("No keys provided for charting")
@@ -75,7 +77,9 @@ class History:
 
         # Create charts directory if it doesn't exist
         charts_dir = Path("charts")
-        charts_dir.mkdir(exist_ok=True)
+        if subfolder:
+            charts_dir = charts_dir / subfolder
+        charts_dir.mkdir(parents=True, exist_ok=True)
 
         # Create the plot
         plt.figure(figsize=(10, 6))
@@ -89,6 +93,15 @@ class History:
             if not values:
                 print(f"Warning: No data for key '{key}'")
                 continue
+
+            # Apply smoothing if requested
+            if smooth > 1:
+                smoothed_values = []
+                for i in range(len(values)):
+                    start_idx = max(0, i - smooth + 1)
+                    window = values[start_idx:i + 1]
+                    smoothed_values.append(sum(window) / len(window))
+                values = smoothed_values
 
             # X-axis starts from 1
             x_values = list(range(1, len(values) + 1))
