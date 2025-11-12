@@ -111,6 +111,30 @@ person_seed = PersonSeed(
 )
 ```
 
+## Visualization
+
+The simulation automatically generates charts showing market dynamics over time. Charts are saved to the `charts/` directory.
+
+### Market-Level Metrics
+
+#### Average Price
+![Average Market Price](charts/market/avg_price.png)
+*Shows how average prices evolve as corporations learn optimal pricing strategies*
+
+#### Average Profit
+![Average Corporate Profit](charts/market/avg_profit.png)
+*Displays profit trends as the market reaches equilibrium*
+
+### Corporation-Level Metrics
+
+#### Individual Pricing Strategies
+![Corporation Prices](charts/corp/corp_prices.png)
+*Tracks each corporation's price adjustments through reinforcement learning*
+
+#### Individual Profit
+![Corporation Profit](charts/corp/corp_profit.png)
+*Shows profit performance for each competing corporation*
+
 ## Testing
 
 Run tests using the Makefile:
