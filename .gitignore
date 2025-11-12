@@ -218,5 +218,6 @@ __marimo__/
 # Claude
 .claude
 
-# Images
+# Images (except charts folder)
 *.png
+!charts/**/*.png
