@@ -1,6 +1,8 @@
 from agents.corporations.RL.MDP import StateDisc, BellmanMDP
 from agents.corporations.agent import Corporation
 from agents.market.agent import Market
+from settings import SimConfig
+from seeds import CorpSeed, PersonSeed
 from unittest.mock import PropertyMock
 import json
 import pytest
@@ -15,8 +17,8 @@ import pytest
         ([50, 44, 22], 0.0),
     ],
 )
-def test_price_bucket(prices, expected):
-    m = Market()
+def test_price_bucket(prices, expected, default_sim_config, default_corp_seed, default_person_seed):
+    m = Market(default_sim_config, default_corp_seed, default_person_seed)
     for price in prices:
         corp = Corporation(price=price)
         m.corporations.append(corp)
@@ -26,8 +28,8 @@ def test_price_bucket(prices, expected):
     assert state.bucket_price(corp=corp) == expected
 
 
-def test_hash_state(mocker):
-    m = Market()
+def test_hash_state(mocker, default_sim_config, default_corp_seed, default_person_seed):
+    m = Market(default_sim_config, default_corp_seed, default_person_seed)
     corp = Corporation()
     state = StateDisc(market=m)
     v = {"price_bucket": "mid"}
