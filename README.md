@@ -65,7 +65,7 @@ git clone <repo-url>
 cd CorpBrain
 
 # Install dependencies (if requirements.txt exists)
-pip install numpy pydantic pytest matplotlib
+uv sync
 ```
 
 ## Usage
@@ -73,7 +73,7 @@ pip install numpy pydantic pytest matplotlib
 ### Running the Simulation
 
 ```bash
-python main.py
+uv run main.py
 ```
 
 This will:
